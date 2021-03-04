@@ -272,10 +272,8 @@ export default class RealtimeDemo extends React.Component<ScreenProps,ScreenStat
         // tensor related props
         cameraTextureHeight={textureDims.height}
         cameraTextureWidth={textureDims.width}
-        // resizeHeight={inputTensorHeight}
-        // resizeWidth={inputTensorWidth}
-        resizeHeight={256}
-        resizeWidth={256}
+        resizeHeight={inputTensorHeight}
+        resizeWidth={inputTensorWidth}
         resizeDepth={3}
         onReady={this.handleImageTensorReady}
         autorender={AUTORENDER}
