@@ -29,6 +29,7 @@ import * as blazeface from '@tensorflow-models/blazeface';
 import * as faceLandmarksDetection from '@tensorflow-models/face-landmarks-detection';
 import {cameraWithTensors, bundleResourceIO} from '@tensorflow/tfjs-react-native';
 import { Rank, Tensor } from '@tensorflow/tfjs';
+import * as HumanFace from './face'
 
 interface ScreenProps {
   returnToMain: () => void;
@@ -41,8 +42,9 @@ interface ScreenState {
   isLoading: boolean;
   // tslint:disable-next-line: no-any
   faceDetector?: blazeface.BlazeFaceModel;
-  emotionDetector?: tf.GraphModel;
+  emotionDetector?: tf.LayersModel;
   faces?: blazeface.NormalizedFace[];
+  predictions?: any[];
 }
 
 const inputTensorWidth = 152;
@@ -75,9 +77,9 @@ export default class RealtimeDemo extends React.Component<ScreenProps,ScreenStat
 
   // load emotion model.
   async loadEmotionModel() {
-    const modelJson =  require('./assets/models/emotion-large.json');
-    const modelWeights = require('./assets/models/emotion-large.bin');
-    const model = await tf.loadGraphModel(bundleResourceIO(modelJson, modelWeights));
+    const modelJson =  require('./assets/models/emotion/model.json');
+    const modelWeights = require('./assets/models/emotion/data.bin');
+    const model = await tf.loadLayersModel(bundleResourceIO(modelJson, modelWeights));
     return model;
   }
 
@@ -105,7 +107,7 @@ export default class RealtimeDemo extends React.Component<ScreenProps,ScreenStat
           // const width = Math.floor((bottomRight.dataSync()[0] - topLeft.dataSync()[0]));
           // const height = Math.floor((bottomRight.dataSync()[1] - topLeft.dataSync()[1]));
           const boxes: Tensor<Rank.R2> = tf.concat([topLeft, bottomRight]).reshape([-1, 4]);
-          const faceTensor = tf.image.cropAndResize(imageTensor.reshape([1, inputTensorHeight, inputTensorWidth, 3]), boxes, [0], [64, 64]);
+          const faceTensor = tf.image.cropAndResize(imageTensor.reshape([1, inputTensorHeight, inputTensorWidth, 3]), boxes, [0], [48, 48]);
           // grayscale the image.
           // the vector to normalize the channel in the order [red, green, blue].
           const grayMatrix = [0.2989, 0.5870, 0.1140];
@@ -120,16 +122,14 @@ export default class RealtimeDemo extends React.Component<ScreenProps,ScreenStat
           red.dispose();
           green.dispose();
           blue.dispose();
-          // merge the new channel to a new grayFace.
-          const grayFace = tf.tidy(() => {
-            return tf.addN([redNorm, greenNorm, blueNorm]).sub(0.5).mul(2);
-          })
-          // dispose each individual channels.
+          // grayscale the image
+          const grayscale = tf.addN([redNorm, greenNorm, blueNorm]);
           redNorm.dispose();
           greenNorm.dispose();
           blueNorm.dispose();
-          // return the matrix;
-          return grayFace;
+          const normalize = tf.tidy(() => grayscale.sub(0.5).mul(2));
+          grayscale.dispose();
+          return normalize;
         })
         tf.dispose(imageTensor);
 
@@ -153,7 +153,8 @@ export default class RealtimeDemo extends React.Component<ScreenProps,ScreenStat
           return predictObj;
         });
         tf.dispose(facesTensor)
-        console.log('emotion thing', predictions)
+        this.setState({predictions})
+        console.log('predictions', this.state.predictions);
       }
 
       if(!AUTORENDER) {
@@ -274,6 +275,8 @@ export default class RealtimeDemo extends React.Component<ScreenProps,ScreenStat
         cameraTextureWidth={textureDims.width}
         resizeHeight={inputTensorHeight}
         resizeWidth={inputTensorWidth}
+        // resizeHeight={256}
+        // resizeWidth={256}
         resizeDepth={3}
         onReady={this.handleImageTensorReady}
         autorender={AUTORENDER}
